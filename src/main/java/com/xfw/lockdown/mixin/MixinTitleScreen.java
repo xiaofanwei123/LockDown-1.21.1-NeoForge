@@ -14,24 +14,30 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(value={TitleScreen.class})
-public abstract class MixinTitleScreen
-        extends Screen {
+
+/**
+ * TitleScreen（主菜单界面），用于根据配置隐藏“单人游戏”和“多人游戏”按钮
+ * 当按钮被隐藏时，下方其他控件会向上移动，填补空缺
+ */
+@Mixin(TitleScreen.class)
+public abstract class MixinTitleScreen extends Screen {
     protected MixinTitleScreen(Component component) {
         super(component);
     }
+
+
 
     @Inject(method={"init"}, at={@At(value="RETURN")})
     private void onInit(CallbackInfo ci) {
         Button singleplayerButton = this.lockdown$findButton(Component.translatable("menu.singleplayer"));
         Button multiplayerButton = this.lockdown$findButton(Component.translatable("menu.multiplayer"));
 
-        if (!Config.disableSingleplayer.get() && singleplayerButton != null) {
+        if (!Config.enableSingleplayer.get() && singleplayerButton != null) {
             this.lockdown$hideButton(singleplayerButton);
             this.lockdown$moveWidgetsBelow(singleplayerButton.getY(), -24);
         }
 
-        if (!Config.disableMultiplayer.get() && multiplayerButton != null) {
+        if (!Config.enableMultiplayer.get() && multiplayerButton != null) {
             this.lockdown$hideButton(multiplayerButton);
             this.lockdown$moveWidgetsBelow(multiplayerButton.getY(), -24);
         }

@@ -3,7 +3,9 @@ package com.xfw.lockdown;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.OptionalLong;
+import java.util.Set;
 import javax.annotation.Nullable;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
@@ -15,12 +17,15 @@ import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 
 public final class TemplateSeedResolver {
-    private static final Object LOCK = new Object();
+    private static final Object LOCK = new Object();//种子缓存
+    private static final Object DIMENSION_CACHE_LOCK = new Object();//维度配置缓存
     @Nullable
     private static Path cachedLevelDatPath;
     private static boolean hasCachedTemplateSeed;
     private static boolean cachedTemplateSeedPresent;
     private static long cachedTemplateSeed;
+    private static List<String> cachedTemplateSeedDimensionsConfig = List.of();
+    private static Set<String> cachedTemplateSeedDimensions = Set.of();
 
     private TemplateSeedResolver() {
     }
@@ -36,6 +41,11 @@ public final class TemplateSeedResolver {
             cachedTemplateSeedPresent = false;
             cachedTemplateSeed = 0L;
         }
+
+        synchronized (DIMENSION_CACHE_LOCK) {
+            cachedTemplateSeedDimensionsConfig = List.of();
+            cachedTemplateSeedDimensions = Set.of();
+        }
     }
 
     public static boolean shouldUseTemplateSeed(ResourceKey<Level> dimensionKey) {
@@ -43,17 +53,31 @@ public final class TemplateSeedResolver {
             return false;
         }
 
-        String dimensionId = dimensionKey.location().toString();
-        return Config.templateSeedDimensions.get().stream().anyMatch(dimensionId::equals);
+        return getTemplateSeedDimensions().contains(dimensionKey.location().toString());
+    }
+
+    public static OptionalLong resolveSeedIfConfigured(MinecraftServer server, ResourceKey<Level> dimensionKey, long fallbackSeed) {
+        if (!shouldUseTemplateSeed(dimensionKey)) {
+            return OptionalLong.empty();
+        }
+
+        return OptionalLong.of(getTemplateSeed(server).orElse(fallbackSeed));
     }
 
     public static long resolveSeed(MinecraftServer server, ResourceKey<Level> dimensionKey, long fallbackSeed) {
-        if (!shouldUseTemplateSeed(dimensionKey)) {
-            return fallbackSeed;
-        }
+        return resolveSeedIfConfigured(server, dimensionKey, fallbackSeed).orElse(fallbackSeed);
+    }
 
-        OptionalLong templateSeed = getTemplateSeed(server);
-        return templateSeed.orElse(fallbackSeed);
+    private static Set<String> getTemplateSeedDimensions() {
+        List<? extends String> configuredDimensions = Config.templateSeedDimensions.get();
+        synchronized (DIMENSION_CACHE_LOCK) {
+            if (!cachedTemplateSeedDimensionsConfig.equals(configuredDimensions)) {
+                cachedTemplateSeedDimensionsConfig = List.copyOf(configuredDimensions);
+                cachedTemplateSeedDimensions = Set.copyOf(cachedTemplateSeedDimensionsConfig);
+            }
+
+            return cachedTemplateSeedDimensions;
+        }
     }
 
     private static OptionalLong getTemplateSeed(MinecraftServer server) {
