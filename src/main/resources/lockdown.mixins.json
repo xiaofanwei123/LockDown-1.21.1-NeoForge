@@ -1,0 +1,21 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.xfw.lockdown.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "MixinPlayerList",
+    "MixinServerLevel"
+  ],
+  "client": [
+    "MixinCreateWorldScreen",
+    "MixinTabNavigationBarBuilder",
+    "MixinTitleScreen"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}
